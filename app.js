@@ -1,4 +1,8 @@
 let ITEMS = [];
+let draftReady = false;
+let dirty = false;       // 사용자가 내용을 건드렸는지 (나갈 때 경고용)   // 처음 화면을 만드는 동안에는 임시 저장을 하지 않는다
+const DRAFT_KEY = "quote-draft-v1";
+const META_IDS = ["quote-no", "quote-date", "customer", "valid"];
 const DEFAULT_ITEMS = JSON.parse(document.getElementById("items-data").textContent);
 const $ = (id) => document.getElementById(id);
 const won = (n) => n.toLocaleString("ko-KR");
@@ -80,6 +84,37 @@ function update() {
   $("total").textContent = won(total);
   $("hangul").textContent = toHangul(total);
   $("hangul-num").textContent = won(total);
+  saveDraft();
+}
+
+// 작성 중인 견적서를 이 브라우저에만 임시 저장 (새로고침해도 남게, 서버로 보내지 않음)
+function saveDraft() {
+  if (!draftReady) return;
+  try {
+    const d = { meta: {}, rows: [...$("rows").children].map((tr) => ({
+      name: (ITEMS[tr.querySelector("select").value] || {}).name || "",
+      qty: tr.querySelector("input").value
+    })) };
+    META_IDS.forEach((id) => { d.meta[id] = $(id).value; });
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  } catch (e) {}
+}
+function readDraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_KEY));
+    return d && Array.isArray(d.rows) && d.meta ? d : null;
+  } catch (e) { return null; }
+}
+function restoreDraft(d) {
+  META_IDS.forEach((id) => { if (d.meta[id] !== undefined) $(id).value = d.meta[id]; });
+  while ($("rows").children.length < d.rows.length) addRow();
+  while ($("rows").children.length > d.rows.length) $("rows").lastElementChild.remove();
+  [...$("rows").children].forEach((tr, i) => {
+    const idx = ITEMS.findIndex((it) => it.name === d.rows[i].name);
+    tr.querySelector("select").value = idx >= 0 ? String(idx) : "";
+    tr.querySelector("input").value = d.rows[i].qty;
+  });
+  update();
 }
 
 $("add-row").addEventListener("click", addRow);
@@ -100,7 +135,31 @@ async function refreshItems() {
 window.addEventListener("storage", (e) => { if (e.key === CSV_KEY) refreshItems(); });
 window.addEventListener("focus", refreshItems);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshItems(); });
+META_IDS.forEach((id) => $(id).addEventListener("input", saveDraft));
+$("reset").addEventListener("click", () => {
+  if (!confirm("작성 중인 내용을 지우고 새 견적서로 시작할까요?")) return;
+  try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  dirty = false;
+  location.reload();
+});
 loadItems(DEFAULT_ITEMS).then((items) => {
   ITEMS = items;
+  const draft = readDraft();
   for (let i = 0; i < 5; i++) addRow();
+  if (draft) { restoreDraft(draft); dirty = true; }
+  draftReady = true;
+  saveDraft();
+});
+
+// 작성 중에 페이지를 나가거나 새로고침하려 하면 브라우저 경고창을 띄운다
+// (경고 문구는 브라우저가 정해서 바꿀 수 없다. 내용은 임시 저장되어 있다)
+const markDirty = (e) => { if (draftReady && !(e && e.target && e.target.id === "csv-file")) dirty = true; };
+document.addEventListener("input", markDirty);
+document.addEventListener("change", markDirty);
+$("add-row").addEventListener("click", markDirty);
+$("rows").addEventListener("click", (e) => { if (e.target.classList && e.target.classList.contains("del")) markDirty(); });
+window.addEventListener("beforeunload", (e) => {
+  if (!dirty) return;
+  e.preventDefault();
+  e.returnValue = "";
 });

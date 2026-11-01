@@ -24,14 +24,14 @@
 <body>
 <div class="wrap">
   <h1>품목 관리</h1>
-  <p class="help">품목을 고치거나 추가한 뒤 <b>[CSV 저장]</b>을 누르세요. 저장하면 견적서 화면(<a href="index.html">index.html</a>)의 품목 목록에 바로 반영돼요.</p>
+  <p class="help">품목을 고치거나 추가한 뒤 <b>[CSV 저장]</b>을 누르세요. 저장하면 견적서 화면의 품목 목록에 바로 반영돼요. 작성 중인 견적서는 그대로 있어요.</p>
   <div class="bar">
     <button id="add">+ 품목 추가</button>
     <button id="save" class="primary">CSV 저장</button>
     <button id="open">CSV 불러오기</button>
     <button id="reload" title="저장된 품목표로 되돌려요">품목 새로고침</button>
     <input id="file" type="file" accept=".csv,text/csv" hidden>
-    <a href="index.html" style="margin-left:auto;align-self:center">견적서로 가기</a>
+    <button id="back" style="margin-left:auto" title="이 창을 닫고 견적서 화면으로 돌아가요">견적서로 돌아가기</button>
   </div>
   <p class="msg" id="msg"></p>
   <table class="list">
@@ -56,6 +56,11 @@
 </div>
 <script src="csv.js"></script>
 <script>
+// 새 창으로 열렸으면 닫고, 직접 열었으면 견적서로 이동
+document.getElementById("back").addEventListener("click", () => {
+  window.close();
+  setTimeout(() => { location.href = "index.html"; }, 200);
+});
 const $ = (id) => document.getElementById(id);
 const DEFAULT = [];
 function row(it) {

@@ -8,10 +8,11 @@
 </head>
 <body>
 <div class="toolbar no-print">
-  <a class="btn" href="items.html">품목 관리</a>
+  <a class="btn" href="items.html" target="_blank" rel="noopener" title="새 창에서 열려요. 작성 중인 견적서는 그대로 있어요">품목 관리</a>
   <button id="load-csv" title="items.csv를 골라 품목 목록을 바꿔요">품목 CSV 불러오기</button>
   <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
   <button id="add-row">+ 줄 추가</button>
+  <button id="reset" title="작성 중인 내용을 지우고 새로 시작해요">새 견적서</button>
   <button id="print" class="primary">인쇄 / PDF 저장</button>
 </div>
 
@@ -23,7 +24,7 @@
       <tr><th>견적번호</th><td><input id="quote-no" value="Q-2026-0001"></td></tr>
       <tr><th>견적일자</th><td><input id="quote-date" type="date"></td></tr>
       <tr><th>수신</th><td><input id="customer" value="(주)새봄학원 귀하"></td></tr>
-      <tr><th>유효기간</th><td><input value="견적일로부터 14일"></td></tr>
+      <tr><th>유효기간</th><td><input id="valid" value="견적일로부터 14일"></td></tr>
     </table>
     <table class="meta supplier">
       <tr><th>상호</th><td>(주)한결사무용품</td></tr>
