@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>품목 관리</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .wrap { max-width: 210mm; margin: 16px auto; padding: 0 8px; }
+  .wrap h1 { font-size: 20px; letter-spacing: 0; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+  table.list { width:100%; border-collapse:collapse; }
+  table.list th, table.list td { border:1px solid #cfd8d3; padding:4px; }
+  table.list th { background:#1e7145; color:#fff; }
+  table.list input { width:100%; box-sizing:border-box; border:0; padding:6px; font:inherit; }
+  table.list input.price { text-align:right; }
+  .msg { color:#1e7145; min-height:1.4em; }
+  .install { margin-top:24px; padding-top:12px; border-top:2px solid #1e7145; }
+  .install h2 { font-size:16px; margin:0 0 8px; }
+  .install ol { padding-left:20px; line-height:1.7; margin:0 0 8px; }
+  .help { color:#595959; font-size:13px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>품목 관리</h1>
+  <p class="help">품목을 고치거나 추가한 뒤 <b>[CSV 저장]</b>을 누르세요. 저장하면 견적서 화면(<a href="index.html">index.html</a>)의 품목 목록에 바로 반영돼요.</p>
+  <div class="bar">
+    <button id="add">+ 품목 추가</button>
+    <button id="save" class="primary">CSV 저장</button>
+    <button id="open">CSV 불러오기</button>
+    <button id="reload" title="저장된 품목표로 되돌려요">품목 새로고침</button>
+    <input id="file" type="file" accept=".csv,text/csv" hidden>
+    <a href="index.html" style="margin-left:auto;align-self:center">견적서로 가기</a>
+  </div>
+  <p class="msg" id="msg"></p>
+  <table class="list">
+    <thead><tr><th style="width:44px">No</th><th>품목</th><th style="width:90px">단위</th><th style="width:120px">단가</th><th style="width:40px"></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <section class="install">
+    <h2>설치·사용법</h2>
+    <ol>
+      <li>견적서 폴더(<code>index.html</code>, <code>items.html</code>, <code>items.csv</code>, <code>app.js</code>, <code>csv.js</code>, <code>style.css</code>)를 PC의 한 폴더에 그대로 둬요. 따로 설치할 프로그램은 없어요.</li>
+      <li><code>index.html</code>을 더블클릭해서 열어요. 크롬이나 엣지를 권해요.</li>
+      <li>품목을 바꾸려면 위쪽 <b>[품목 관리]</b>(이 화면)에서 추가·수정·삭제하고 <b>[CSV 저장]</b>을 눌러요.</li>
+      <li>저장 위치를 물으면 이 폴더의 <code>items.csv</code>를 골라 덮어써요. 다른 브라우저는 내려받기 폴더에 저장되니 이 폴더로 옮겨 주세요.</li>
+      <li>견적서 화면은 저장하는 즉시 바뀐 품목으로 갱신돼요. 작성 중에 F5를 눌러도 내용이 남고, 되돌리려면 [품목 새로고침]을 눌러요.</li>
+    </ol>
+    <p class="help">
+      · 파일을 그냥 열면 브라우저 보안 때문에 폴더의 <code>items.csv</code>를 자동으로 읽지 못해요. 처음 한 번 <b>[CSV 불러오기]</b>로 <code>items.csv</code>를 고르면 그 브라우저가 기억해요.<br>
+      · <code>items.csv</code>는 엑셀로 열어 고쳐도 돼요. 품목·단위·단가 순서를 지키고 첫 줄은 제목으로 두세요.<br>
+      · 웹 서버나 호스팅에 올리면 <code>items.csv</code>를 자동으로 읽어요.
+    </p>
+  </section>
+</div>
+<script src="csv.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const DEFAULT = [];
+function row(it) {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td class="center no"></td>
+    <td><input class="name" placeholder="품목 이름"></td>
+    <td><input class="unit" placeholder="개"></td>
+    <td><input class="price" inputmode="numeric" placeholder="0"></td>
+    <td class="center"><button class="del" title="삭제">×</button></td>`;
+  tr.querySelector(".name").value = it.name || "";
+  tr.querySelector(".unit").value = it.unit || "";
+  tr.querySelector(".price").value = it.price === undefined ? "" : it.price;
+  tr.querySelector(".del").onclick = () => { tr.remove(); renumber(); saveDraft(); };
+  tr.addEventListener("input", saveDraft);
+  $("rows").appendChild(tr); renumber(); return tr;
+}
+function renumber() { [...$("rows").children].forEach((tr, i) => tr.querySelector(".no").textContent = i + 1); }
+function fill(items) { $("rows").innerHTML = ""; items.forEach(row); }
+function collect() {
+  return [...$("rows").children].map((tr) => ({
+    name: tr.querySelector(".name").value.trim(),
+    unit: tr.querySelector(".unit").value.trim(),
+    price: Number(tr.querySelector(".price").value.replace(/[,\s원]/g, "")),
+  })).filter((it) => it.name && Number.isFinite(it.price));
+}
+const DRAFT_KEY = "quote-items-draft";
+function saveDraft() {
+  const rows = [...$("rows").children].map((tr) => ({
+    name: tr.querySelector(".name").value, unit: tr.querySelector(".unit").value, price: tr.querySelector(".price").value }));
+  try { localStorage.setItem(DRAFT_KEY, JSON.stringify(rows)); } catch (e) {}
+}
+function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+function readDraft() { try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY)); return Array.isArray(d) && d.length ? d : null; } catch (e) { return null; } }
+function say(t) { $("msg").textContent = t; }
+
+$("add").onclick = () => { row({}).querySelector(".name").focus(); saveDraft(); };
+$("open").onclick = () => $("file").click();
+$("file").onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const text = await f.text(); const items = csvToItems(text);
+  if (!items.length) { say("읽을 수 있는 품목이 없어요. 첫 줄은 제목, 이후 품목·단위·단가 순서인지 확인하세요."); return; }
+  fill(items); rememberCSV(text); saveDraft(); say(`${items.length}개 품목을 불러왔어요. 견적서에 쓰려면 [CSV 저장]을 눌러 주세요.`);
+};
+$("save").onclick = async () => {
+  const items = collect();
+  if (!items.length) { say("저장할 품목이 없어요. 품목 이름과 단가(숫자)를 확인하세요."); return; }
+  const text = itemsToCSV(items);
+  rememberCSV(text); clearDraft();
+  try {
+    if (window.showSaveFilePicker) {
+      const h = await showSaveFilePicker({ suggestedName: "items.csv", types: [{ description: "CSV", accept: { "text/csv": [".csv"] } }] });
+      const w = await h.createWritable(); await w.write(text); await w.close();
+      say(`${items.length}개 품목을 저장했어요. 견적서 화면을 새로고침(F5)하면 반영돼요.`); return;
+    }
+  } catch (e) { if (e.name === "AbortError") { say("저장을 취소했어요."); return; } }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" })); a.download = "items.csv"; a.click();
+  say(`${items.length}개 품목을 items.csv로 내려받았어요. 이 폴더의 items.csv에 덮어써 주세요.`);
+};
+$("reload").onclick = async () => {
+  if (!confirm("저장하지 않은 수정 내용은 사라져요. 저장된 품목표로 다시 불러올까요?")) return;
+  clearDraft();
+  const items = await loadItems(DEFAULT);
+  fill(items.length ? items : [{}]);
+  say(items.length ? `저장된 품목 ${items.length}개를 다시 불러왔어요.` : "저장된 품목표가 없어요. [CSV 불러오기]로 items.csv를 골라 주세요.");
+};
+const draft = readDraft();
+if (draft) { fill(draft); say("작성 중이던 내용을 복구했어요. 저장하려면 [CSV 저장], 되돌리려면 [품목 새로고침]을 누르세요."); }
+else loadItems(DEFAULT).then((items) => { fill(items.length ? items : [{}]); say(items.length ? `${items.length}개 품목이 있어요.` : "품목이 없어요. [CSV 불러오기]로 items.csv를 고르거나 직접 추가하세요."); });
+</script>
+</body>
+</html>
